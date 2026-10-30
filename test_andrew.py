@@ -2,11 +2,10 @@
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import Select
 import time
 import random
-import pytest
+from selenium.webdriver.common.action_chains import ActionChains
 
 ###  REPLACE THE BELOW WITH A VALID SESSION ID  ###
 ### Logged in webpage -> Inspect -> Application ###
@@ -21,7 +20,7 @@ def create_session(func):
         driver.implicitly_wait(10) # ensure all web pages fully load
         driver.get("https://opencart.abstracta.us") # navigate to home page
         driver.delete_cookie("OCSESSID") # delete then replace auth cookie
-        driver.add_cookie(               # with a valid one
+        driver.add_cookie(
             {
                 "name": "OCSESSID",
                 "value": VALID_SESSION_ID,
@@ -206,4 +205,213 @@ def test_f16_s3(driver: webdriver.Chrome):
 
     driver.quit()
 
+
+
+
+def empty_cart(driver: webdriver.Chrome):
+    ' Remove all items from the cart '
+
+    driver.get("https://opencart.abstracta.us/index.php?route=checkout/cart")
+    title = driver.title
+    assert title == "Shopping Cart", f"Expected title to be 'Shopping Cart' but got '{title}'"
+
+    content = driver.find_element(By.ID, "content")
+    para = content.find_element(By.TAG_NAME, "p")
+
+    while para.text != "Your shopping cart is empty!":
+        # Delete the first entry
+        content.find_element(By.CLASS_NAME, 'btn-danger').click()
+        driver.refresh()
+        content = driver.find_element(By.ID, "content")
+        para = content.find_element(By.TAG_NAME, "p")
+
+# pytest test_andrew.py::test_f17_s1
+@create_session # create driver object, authenticate and set implicitly_wait to 10
+def test_f17_s1(driver: webdriver.Chrome):
+    ' Test Function 17 Scenario 1 - Checkout when cart is empty '
+
+    # Empty the cart
+    empty_cart(driver)
+
+    # Load the checkout url
+    driver.get("https://opencart.abstracta.us/index.php?route=checkout/checkout")
+    title = driver.title
+
+    # Check that the Checkout link redirected to the Shopping Cart page
+    assert title == "Shopping Cart", f"Incorrect page title. Expected Shopping Cart. Got {title}"
+
+
+
+def add_item_to_cart(driver: webdriver.Chrome):
+    ' Function to add an iMac to the shopping cart '
+    driver.get("https://opencart.abstracta.us/index.php?route=product/product&path=20_27&product_id=41")
+
+    # Click the buy button
+    driver.find_element(By.ID, 'product').find_element(By.TAG_NAME, 'button').click()
+
+
+# pytest test_andrew.py::test_f17_s2
+@create_session # create driver object, authenticate and set implicitly_wait to 10
+def test_f17_s2(driver: webdriver.Chrome):
+    ' Test Function 17 Scenario 2 - Checkout successful with item in cart and primary address '
+
+    driver.get("https://opencart.abstracta.us/index.php?route=checkout/checkout")
+    title = driver.title
+
+    # Check if the page was redirected. If so, add an item to the cart and return to checkout
+    if title == "Shopping Cart":
+        add_item_to_cart(driver)
+        driver.get("https://opencart.abstracta.us/index.php?route=checkout/checkout")
+        title = driver.title
+
+    ActionChains(driver).scroll_by_amount(0, 300).perform() # the bitnami icon is in the way so have to scroll down
+    driver.find_element(By.ID, 'button-payment-address').click()
+    driver.find_element(By.ID, 'button-shipping-address').click()
+    time.sleep(1)
+    inputs = driver.find_elements(By.TAG_NAME, 'radio')
+    for i in inputs:
+        print(i.get_property('name'))
+        if i.get_property('name') == 'shipping_method':
+            i.click()
+            break
+    time.sleep(1)
+    driver.find_element(By.ID, 'button-shipping-method').click()
+    ActionChains(driver).scroll_by_amount(0, 200).perform() # the bitnami icon is in the way so have to scroll down
+    time.sleep(1)
+
+    inputs = driver.find_elements(By.TAG_NAME, 'radio')
+    for i in inputs:
+        if i.get_property('value') == 'bank_transfer':
+            i.click()
+            break
+    time.sleep(1)
+    inputs = driver.find_elements(By.TAG_NAME, 'input')
+
+    for i in inputs:
+        if i.get_property('name') == 'agree':
+            i.click()
+            break
+    time.sleep(1)
+    driver.find_element(By.ID, 'button-payment-method').click()
+    time.sleep(1)
+    driver.find_element(By.ID, 'button-confirm').click()
+    time.sleep(1)
+
+    title = driver.title
+    assert title == 'Your order has been placed!', f"Incorrect title. Expected Your order has been placed! Got {title}"
+
+
+
+
+# pytest test_andrew.py::test_f17_s3
+@create_session # create driver object, authenticate and set implicitly_wait to 10
+def test_f17_s3(driver: webdriver.Chrome):
+    ' Test Function 17 Scenario 3 - Checkout unsuccessful due to not ticking TOS box '
+
+    driver.get("https://opencart.abstracta.us/index.php?route=checkout/checkout")
+    title = driver.title
+
+    # Check if the page was redirected. If so, add an item to the cart and return to checkout
+    if title == "Shopping Cart":
+        add_item_to_cart(driver)
+        driver.get("https://opencart.abstracta.us/index.php?route=checkout/checkout")
+        title = driver.title
+
+    ActionChains(driver).scroll_by_amount(0, 300).perform() # the bitnami icon is in the way so have to scroll down
+    driver.find_element(By.ID, 'button-payment-address').click()
+    driver.find_element(By.ID, 'button-shipping-address').click()
+    time.sleep(1)
+    inputs = driver.find_elements(By.TAG_NAME, 'radio')
+    for i in inputs:
+        print(i.get_property('name'))
+        if i.get_property('name') == 'shipping_method':
+            i.click()
+            break
+    time.sleep(1)
+    driver.find_element(By.ID, 'button-shipping-method').click()
+    ActionChains(driver).scroll_by_amount(0, 200).perform() # the bitnami icon is in the way so have to scroll down
+    time.sleep(1)
+
+    inputs = driver.find_elements(By.TAG_NAME, 'radio')
+    for i in inputs:
+        if i.get_property('value') == 'bank_transfer':
+            i.click()
+            break
+    time.sleep(1)
+
+    driver.find_element(By.ID, 'button-payment-method').click()
+    header = driver.find_elements(By.CLASS_NAME, 'alert-danger')
+
+    assert len(header) == 1, "Alert header is not found"
+
+
+
+# pytest test_andrew.py::test_f18_s1
+@create_session # create driver object, authenticate and set implicitly_wait to 10
+def test_f18_s1(driver: webdriver.Chrome):
+    ' Test Function 18 Scenario 1 - Check specific order details '
+
+    driver.get("https://opencart.abstracta.us/index.php?route=account/order")
+    title = driver.title
+
+    assert title == 'Order History', f"Incorrect title. Expected Order History. Got {title}"
+
+    driver.find_elements(By.CLASS_NAME, 'btn-info')[0].click()
+
+    title = driver.title
+    assert title == 'Order Information', f"Incorrect title. Expected Order Information. Got {title}"
+
+
+
+# pytest test_andrew.py::test_f18_s2
+@create_session # create driver object, authenticate and set implicitly_wait to 10
+def test_f18_s2(driver: webdriver.Chrome):
+    ' Test Function 18 Scenario 2 - Submit return request '
+    # Open the order information page on a product
+    driver.get("https://opencart.abstracta.us/index.php?route=account/order")
+    driver.find_elements(By.CLASS_NAME, 'btn-info')[0].click()
+    # Click the return button
+
+    driver.find_elements(By.CLASS_NAME, 'btn-danger')[1].click()
+
+    # Fill out the form and submit
+    input_types = driver.find_elements(By.TAG_NAME, 'input')
+    for i in input_types:
+        if i.get_property('name') == 'return_reason_id' and i.get_property('value') == '4':
+            i.click()
+            break
+        
+    input_types = driver.find_elements(By.TAG_NAME, 'input')
+    for i in input_types:
+        if i.get_property('type') == 'submit' and i.get_property('value') == 'Submit':
+            i.click()
+            break
+
+    assert driver.title == 'Product Returns', f"Incorrect title. Expected Order History. Got {driver.title}"
+
+
+# pytest test_andrew.py::test_f18_s3
+@create_session # create driver object, authenticate and set implicitly_wait to 10
+def test_f18_s3(driver: webdriver.Chrome):
+    ' Test Function 18 Scenario 3 - Navigate next pages in history '
+
+    driver.get("https://opencart.abstracta.us/index.php?route=account/order")
+
+    # print(driver.find_element(By.CLASS_NAME, 'col-sm-6').text.split(' '))
+    pages = driver.find_elements(By.CLASS_NAME, 'col-sm-6')[1].text.split(' ')[6][1:]
+
+    done = False
+    counted_pages = 1
+
+    while not done:
+        anchors = driver.find_elements(By.TAG_NAME, 'a')
+        for i in anchors:
+            if i.text == '>':
+                i.click()
+                counted_pages += 1
+                break
+        else:
+            done = True
+
+    assert pages == str(counted_pages), f"Incorrect number of pages found. Expected {pages}. Got {counted_pages}"
 
